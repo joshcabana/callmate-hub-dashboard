@@ -10,10 +10,18 @@ import Dashboard from "./pages/Dashboard";
 import CallLogs from "./pages/CallLogs";
 import AgentSettings from "./pages/AgentSettings";
 import Billing from "./pages/Billing";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 30_000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,10 +31,20 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Public Route */}
+            {/* Public */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected Routes */}
+            {/* Onboarding — protected but outside DashboardLayout */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected dashboard routes */}
             <Route
               path="/*"
               element={

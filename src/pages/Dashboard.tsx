@@ -1,4 +1,4 @@
-import { Phone, Clock, Bot, TrendingUp, TrendingDown } from "lucide-react";
+import { Phone, Clock, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   LineChart,
@@ -10,40 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { motion } from "framer-motion";
-
-const metrics = [
-  {
-    title: "Total Calls",
-    value: "2,847",
-    change: "+12.5%",
-    trend: "up" as const,
-    icon: Phone,
-  },
-  {
-    title: "Minutes Used",
-    value: "1,284",
-    change: "+8.2%",
-    trend: "up" as const,
-    icon: Clock,
-  },
-  {
-    title: "Active Agents",
-    value: "6",
-    change: "-1",
-    trend: "down" as const,
-    icon: Bot,
-  },
-];
-
-const chartData = [
-  { day: "Mon", calls: 312 },
-  { day: "Tue", calls: 428 },
-  { day: "Wed", calls: 389 },
-  { day: "Thu", calls: 502 },
-  { day: "Fri", calls: 471 },
-  { day: "Sat", calls: 258 },
-  { day: "Sun", calls: 187 },
-];
+import { useQuery } from "@tanstack/react-query";
+import { fetchDashboardMetrics } from "@/lib/supabase";
 
 const container = {
   hidden: {},
@@ -54,74 +22,192 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
+function pctChange(current: number, previous: number): string {
+  if (previous === 0 && current === 0) return "0%";
+  if (previous === 0) return "+100%";
+  const pct = ((current - previous) / previous) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function MetricSkeleton() {
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-4 animate-pulse rounded bg-muted" />
+      </CardHeader>
+      <CardContent>
+        <div className="h-9 w-24 animate-pulse rounded bg-muted mb-2" />
+        <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Dashboard() {
+  const {
+    data: metrics,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ["dashboard_metrics"],
+    queryFn: fetchDashboardMetrics,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const callsTrend = metrics
+    ? pctChange(metrics.callsThisWeek, metrics.callsLastWeek)
+    : null;
+  const minutesTrend = metrics
+    ? pctChange(metrics.minutesThisWeek, metrics.minutesLastWeek)
+    : null;
+
+  const metricCards = metrics
+    ? [
+        {
+          title: "Total Calls",
+          value: metrics.totalCalls.toLocaleString(),
+          change: callsTrend!,
+          trend: (metrics.callsThisWeek >= metrics.callsLastWeek ? "up" : "down") as "up" | "down",
+          icon: Phone,
+        },
+        {
+          title: "Minutes Used",
+          value: metrics.totalMinutes.toLocaleString(),
+          change: minutesTrend!,
+          trend: (metrics.minutesThisWeek >= metrics.minutesLastWeek ? "up" : "down") as "up" | "down",
+          icon: Clock,
+        },
+      ]
+    : [];
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Your AI receptionist at a glance.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Your AI receptionist at a glance.</p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {metrics.map((m) => (
-          <motion.div key={m.title} variants={item}>
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {m.title}
-                </CardTitle>
-                <m.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-display font-bold">{m.value}</div>
-                <div className="flex items-center gap-1 mt-1 text-xs">
-                  {m.trend === "up" ? (
-                    <TrendingUp className="h-3 w-3 text-success" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3 text-destructive" />
-                  )}
-                  <span className={m.trend === "up" ? "text-success" : "text-destructive"}>
-                    {m.change}
-                  </span>
-                  <span className="text-muted-foreground">vs last week</span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+      {/* Error banner */}
+      {isError && (
+        <motion.div variants={item}>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Failed to load metrics:{" "}
+            {error instanceof Error ? error.message : "Unknown error"}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Metric cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {isLoading
+          ? [0, 1].map((i) => (
+              <motion.div key={i} variants={item}>
+                <MetricSkeleton />
+              </motion.div>
+            ))
+          : metricCards.map((m) => (
+              <motion.div key={m.title} variants={item}>
+                <Card className="bg-card border-border">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {m.title}
+                    </CardTitle>
+                    <m.icon className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-display font-bold">{m.value}</div>
+                    <div className="flex items-center gap-1 mt-1 text-xs">
+                      {m.trend === "up" ? (
+                        <TrendingUp className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-destructive" />
+                      )}
+                      <span
+                        className={
+                          m.trend === "up" ? "text-emerald-500" : "text-destructive"
+                        }
+                      >
+                        {m.change}
+                      </span>
+                      <span className="text-muted-foreground">vs last 7 days</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
       </div>
 
+      {/* Chart */}
       <motion.div variants={item}>
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="font-display text-lg">Call Volume — Last 7 Days</CardTitle>
+            <CardTitle className="font-display text-lg">
+              Call Volume — Last 7 Days
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 20% 16%)" />
-                  <XAxis dataKey="day" stroke="hsl(215 20% 55%)" fontSize={12} />
-                  <YAxis stroke="hsl(215 20% 55%)" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(222 44% 10%)",
-                      border: "1px solid hsl(222 20% 16%)",
-                      borderRadius: "8px",
-                      color: "hsl(210 40% 93%)",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="calls"
-                    stroke="hsl(173 80% 50%)"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(173 80% 50%)", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="h-[280px]">
+              {isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={metrics?.dailyCounts ?? []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(222 20% 16%)"
+                    />
+                    <XAxis
+                      dataKey="day"
+                      stroke="hsl(215 20% 55%)"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      stroke="hsl(215 20% 55%)"
+                      fontSize={12}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(222 44% 10%)",
+                        border: "1px solid hsl(222 20% 16%)",
+                        borderRadius: "8px",
+                        color: "hsl(210 40% 93%)",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="calls"
+                      stroke="hsl(173 80% 50%)"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(173 80% 50%)", r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
+            {!isLoading && metrics?.totalCalls === 0 && (
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                No calls yet — connect your Vapi agent to start receiving data.
+              </p>
+            )}
           </CardContent>
         </Card>
       </motion.div>
