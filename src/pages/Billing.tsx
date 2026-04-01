@@ -1,14 +1,51 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Zap } from "lucide-react";
+import { CreditCard, Zap, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Billing() {
-  const usedMinutes = 1284;
-  const totalMinutes = 2000;
+  const { business } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Hardcoded for now. In a real scenario, this is mapped from stripe_price_id or your DB
+  const isPro = business?.subscription_status === "active";
+  const usedMinutes = 521; // Placeholder until usage API is built
+  const totalMinutes = isPro ? 10000 : 2000;
   const usagePercent = Math.round((usedMinutes / totalMinutes) * 100);
+
+  const handleCheckout = async () => {
+    if (!business) return;
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          business_id: business.id,
+          // If you have a real price ID, insert it here:
+          // price_id: "price_1ABC123", 
+        }),
+      });
+
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("No checkout URL returned", data);
+      }
+    } catch (err) {
+      console.error("Failed to initiate checkout", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 max-w-2xl">
@@ -24,20 +61,26 @@ export default function Billing() {
               <CardTitle className="font-display text-lg">Current Plan</CardTitle>
               <CardDescription>Your active subscription details.</CardDescription>
             </div>
-            <Badge className="bg-primary/15 text-primary border-0 text-sm px-3 py-1">
-              Pro
+            <Badge variant={isPro ? "default" : "secondary"}>
+              {isPro ? "Pro Plan" : business?.plan || "Starter"}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Monthly Price</p>
-              <p className="text-2xl font-display font-bold">$49<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="text-2xl font-display font-bold capitalize">
+                {business?.subscription_status || "Free"}
+              </p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Billing Cycle</p>
-              <p className="text-sm font-medium">Renews April 15, 2024</p>
+              <p className="text-sm text-muted-foreground">Period Ends</p>
+              <p className="text-sm font-medium">
+                {business?.subscription_current_period_end
+                  ? new Date(business.subscription_current_period_end).toLocaleDateString()
+                  : "N/A"}
+              </p>
             </div>
           </div>
 
@@ -57,11 +100,7 @@ export default function Billing() {
             <ul className="space-y-1.5 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <Zap className="h-3.5 w-3.5 text-primary" />
-                2,000 minutes / month
-              </li>
-              <li className="flex items-center gap-2">
-                <Zap className="h-3.5 w-3.5 text-primary" />
-                Up to 10 active agents
+                {totalMinutes.toLocaleString()} minutes / month
               </li>
               <li className="flex items-center gap-2">
                 <Zap className="h-3.5 w-3.5 text-primary" />
@@ -76,9 +115,18 @@ export default function Billing() {
         </CardContent>
       </Card>
 
-      <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 w-full">
-        <CreditCard className="h-4 w-4" />
-        Upgrade / Manage Billing via Stripe
+      <Button
+        size="lg"
+        onClick={handleCheckout}
+        disabled={isLoading || !business}
+        className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 w-full"
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <CreditCard className="h-4 w-4" />
+        )}
+        {isPro ? "Manage Billing via StripePortal" : "Upgrade to Pro"}
       </Button>
     </motion.div>
   );
