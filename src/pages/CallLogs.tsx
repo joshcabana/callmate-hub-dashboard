@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,20 +19,97 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { motion } from "framer-motion";
-
-const calls = [
-  { id: 1, date: "2024-03-28 14:32", caller: "+1 (415) 555-0142", duration: "3:24", status: "Completed" as const, transcript: "Hi, I'd like to schedule an appointment for next Tuesday at 2 PM.\n\nAgent: Of course! Let me check availability... I have an opening at 2:15 PM on Tuesday. Would that work?\n\nCaller: That's perfect, thank you!\n\nAgent: Great, you're all set. We'll send a confirmation to your phone." },
-  { id: 2, date: "2024-03-28 13:17", caller: "+1 (628) 555-0198", duration: "1:45", status: "Completed" as const, transcript: "Hello, what are your business hours?\n\nAgent: We're open Monday through Friday, 9 AM to 6 PM, and Saturdays from 10 AM to 3 PM.\n\nCaller: Thanks!" },
-  { id: 3, date: "2024-03-28 11:05", caller: "+1 (510) 555-0233", duration: "0:12", status: "Failed" as const, transcript: "Call disconnected before agent could respond." },
-  { id: 4, date: "2024-03-27 16:48", caller: "+1 (925) 555-0177", duration: "5:02", status: "Completed" as const, transcript: "I need to reschedule my appointment from Friday to next Monday.\n\nAgent: Sure, I can help with that. Let me pull up your record... Found it. I have availability at 10 AM and 3 PM on Monday.\n\nCaller: 3 PM works.\n\nAgent: Done! Your appointment has been moved to Monday at 3 PM." },
-  { id: 5, date: "2024-03-27 15:22", caller: "+1 (650) 555-0311", duration: "2:38", status: "Completed" as const, transcript: "Can I get a price quote for your premium package?\n\nAgent: Absolutely! Our premium package starts at $149/month and includes unlimited calls, priority support, and advanced analytics.\n\nCaller: That sounds great. I'll think about it." },
-  { id: 6, date: "2024-03-27 10:11", caller: "+1 (408) 555-0099", duration: "0:08", status: "Failed" as const, transcript: "No audio detected. Call terminated." },
-  { id: 7, date: "2024-03-26 17:30", caller: "+1 (707) 555-0265", duration: "4:15", status: "Completed" as const, transcript: "I have a complaint about my last visit. The waiting time was over 40 minutes.\n\nAgent: I'm really sorry to hear that. Let me flag this with our manager and we'll follow up with you within 24 hours.\n\nCaller: I appreciate that." },
-];
+import { AlertCircle, Inbox } from "lucide-react";
+import { fetchCallLogs, type CallLog } from "@/lib/supabase";
 
 export default function CallLogs() {
-  const [selectedCall, setSelectedCall] = useState<typeof calls[0] | null>(null);
+  const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
 
+  const {
+    data: calls = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["call_logs"],
+    queryFn: fetchCallLogs,
+    refetchInterval: 30_000, // Auto-refresh every 30 seconds
+  });
+
+  // ── Loading Skeleton ───────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Call Logs</h1>
+          <p className="text-muted-foreground mt-1">Review recent call activity and transcripts.</p>
+        </div>
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Recent Calls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+                  <div className="ml-auto h-8 w-28 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // ── Error State ────────────────────────────────────────────────
+  if (isError) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Call Logs</h1>
+          <p className="text-muted-foreground mt-1">Review recent call activity and transcripts.</p>
+        </div>
+        <Card className="bg-destructive/10 border-destructive/30">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Failed to load call logs</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // ── Empty State ────────────────────────────────────────────────
+  if (calls.length === 0) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Call Logs</h1>
+          <p className="text-muted-foreground mt-1">Review recent call activity and transcripts.</p>
+        </div>
+        <Card className="bg-card border-border">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Inbox className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="font-display font-semibold text-lg">No calls yet</p>
+            <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+              When your AI receptionist takes its first call, the transcript and summary will appear here automatically.
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // ── Data Table ─────────────────────────────────────────────────
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div>
@@ -48,28 +127,21 @@ export default function CallLogs() {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Date</TableHead>
                 <TableHead className="text-muted-foreground">Caller</TableHead>
-                <TableHead className="text-muted-foreground">Duration</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
+                <TableHead className="text-muted-foreground">Summary</TableHead>
                 <TableHead className="text-muted-foreground text-right">Transcript</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {calls.map((call) => (
                 <TableRow key={call.id} className="border-border">
-                  <TableCell className="text-sm">{call.date}</TableCell>
-                  <TableCell className="font-mono text-sm">{call.caller}</TableCell>
-                  <TableCell className="text-sm">{call.duration}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={call.status === "Completed" ? "default" : "destructive"}
-                      className={
-                        call.status === "Completed"
-                          ? "bg-success/15 text-success border-0 hover:bg-success/20"
-                          : ""
-                      }
-                    >
-                      {call.status}
-                    </Badge>
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {format(new Date(call.created_at), "d MMM yyyy, HH:mm")}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {call.caller_number || "Unknown"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
+                    {call.summary || "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -77,8 +149,9 @@ export default function CallLogs() {
                       size="sm"
                       onClick={() => setSelectedCall(call)}
                       className="text-primary hover:text-primary hover:bg-primary/10"
+                      disabled={!call.transcript}
                     >
-                      View Transcript
+                      {call.transcript ? "View Transcript" : "No Transcript"}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -92,16 +165,34 @@ export default function CallLogs() {
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">
-              Call Transcript — {selectedCall?.caller}
+              Call Transcript — {selectedCall?.caller_number || "Unknown Caller"}
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-2 space-y-2 text-sm">
+          <div className="mt-2 space-y-3 text-sm">
             <div className="flex gap-4 text-muted-foreground text-xs">
-              <span>{selectedCall?.date}</span>
-              <span>Duration: {selectedCall?.duration}</span>
+              <span>
+                {selectedCall?.created_at
+                  ? format(new Date(selectedCall.created_at), "d MMM yyyy, HH:mm")
+                  : ""}
+              </span>
+              {selectedCall?.intent_detected && (
+                <Badge variant="outline" className="text-xs">
+                  {selectedCall.intent_detected}
+                </Badge>
+              )}
             </div>
+
+            {selectedCall?.summary && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
+                  AI Summary
+                </p>
+                <p className="text-foreground leading-relaxed">{selectedCall.summary}</p>
+              </div>
+            )}
+
             <div className="bg-secondary rounded-lg p-4 whitespace-pre-line text-foreground leading-relaxed max-h-[300px] overflow-auto">
-              {selectedCall?.transcript}
+              {selectedCall?.transcript || "No transcript available."}
             </div>
           </div>
         </DialogContent>
