@@ -65,6 +65,9 @@ export default function Dashboard() {
   const minutesTrend = metrics
     ? pctChange(metrics.minutesThisWeek, metrics.minutesLastWeek)
     : null;
+  const avgDuration = metrics && metrics.totalCalls > 0
+    ? Math.round((metrics.totalMinutes / metrics.totalCalls) * 10) / 10
+    : 0;
 
   const metricCards = metrics
     ? [
@@ -81,6 +84,20 @@ export default function Dashboard() {
           change: minutesTrend!,
           trend: (metrics.minutesThisWeek >= metrics.minutesLastWeek ? "up" : "down") as "up" | "down",
           icon: Clock,
+        },
+        {
+          title: "Avg Duration",
+          value: `${avgDuration}m`,
+          change: "",
+          trend: "up" as "up" | "down",
+          icon: Clock,
+        },
+        {
+          title: "This Week",
+          value: metrics.callsThisWeek.toLocaleString(),
+          change: callsTrend!,
+          trend: (metrics.callsThisWeek >= metrics.callsLastWeek ? "up" : "down") as "up" | "down",
+          icon: TrendingUp,
         },
       ]
     : [];
@@ -113,7 +130,7 @@ export default function Dashboard() {
       )}
 
       {/* Metric cards */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {isLoading
           ? [0, 1].map((i) => (
               <motion.div key={i} variants={item}>

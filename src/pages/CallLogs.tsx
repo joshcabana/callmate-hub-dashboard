@@ -18,9 +18,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { AlertCircle, Inbox } from "lucide-react";
+import { AlertCircle, Inbox, Download } from "lucide-react";
 import { fetchCallLogs, type CallLog } from "@/lib/supabase";
+
+function exportToCSV(calls: CallLog[]) {
+  const headers = ["Date", "Caller", "Caller Name", "Callback", "Intent", "Summary"];
+  const rows = calls.map((c) => [
+    format(new Date(c.created_at), "yyyy-MM-dd HH:mm"),
+    c.caller_number || "Unknown",
+    c.caller_name || "",
+    c.callback_number || "",
+    c.intent_detected || "",
+    (c.summary || "").replace(/,/g, ";").replace(/\n/g, " "),
+  ]);
+  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `callmate-logs-${format(new Date(), "yyyy-MM-dd")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function CallLogs() {
   const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
@@ -112,9 +133,20 @@ export default function CallLogs() {
   // ── Data Table ─────────────────────────────────────────────────
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Call Logs</h1>
-        <p className="text-muted-foreground mt-1">Review recent call activity and transcripts.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Call Logs</h1>
+          <p className="text-muted-foreground mt-1">Review recent call activity and transcripts.</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => exportToCSV(calls)}
+          className="gap-1.5"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export CSV
+        </Button>
       </div>
 
       <Card className="bg-card border-border">
@@ -165,36 +197,72 @@ export default function CallLogs() {
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">
-              Call Transcript — {selectedCall?.caller_number || "Unknown Caller"}
+              Call Details — {selectedCall?.caller_number || "Unknown Caller"}
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-2 space-y-3 text-sm">
-            <div className="flex gap-4 text-muted-foreground text-xs">
-              <span>
-                {selectedCall?.created_at
-                  ? format(new Date(selectedCall.created_at), "d MMM yyyy, HH:mm")
-                  : ""}
-              </span>
-              {selectedCall?.intent_detected && (
-                <Badge variant="outline" className="text-xs">
-                  {selectedCall.intent_detected}
-                </Badge>
-              )}
-            </div>
-
-            {selectedCall?.summary && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
-                  AI Summary
-                </p>
-                <p className="text-foreground leading-relaxed">{selectedCall.summary}</p>
-              </div>
+          <div className="flex gap-4 text-muted-foreground text-xs mt-1">
+            <span>
+              {selectedCall?.created_at
+                ? format(new Date(selectedCall.created_at), "d MMM yyyy, HH:mm")
+                : ""}
+            </span>
+            {selectedCall?.intent_detected && (
+              <Badge variant="outline" className="text-xs">
+                {selectedCall.intent_detected}
+              </Badge>
             )}
-
-            <div className="bg-secondary rounded-lg p-4 whitespace-pre-line text-foreground leading-relaxed max-h-[300px] overflow-auto">
-              {selectedCall?.transcript || "No transcript available."}
-            </div>
           </div>
+
+          <Tabs defaultValue="transcript" className="mt-3">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="transcript">Transcript</TabsTrigger>
+              <TabsTrigger value="extracted">Extracted Data</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="transcript" className="space-y-3 mt-3">
+              {selectedCall?.summary && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
+                    AI Summary
+                  </p>
+                  <p className="text-foreground text-sm leading-relaxed">{selectedCall.summary}</p>
+                </div>
+              )}
+              <div className="bg-secondary rounded-lg p-4 whitespace-pre-line text-sm text-foreground leading-relaxed max-h-[300px] overflow-auto">
+                {selectedCall?.transcript || "No transcript available."}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="extracted" className="mt-3">
+              <div className="space-y-3">
+                {[
+                  { label: "Caller Name", value: selectedCall?.caller_name },
+                  { label: "Callback Number", value: selectedCall?.callback_number },
+                  { label: "Intent Detected", value: selectedCall?.intent_detected },
+                  { label: "Call ID", value: selectedCall?.call_id },
+                ].map((field) => (
+                  <div key={field.label} className="flex justify-between items-center border-b border-border pb-2">
+                    <span className="text-sm text-muted-foreground">{field.label}</span>
+                    <span className="text-sm font-medium font-mono">
+                      {field.value || "—"}
+                    </span>
+                  </div>
+                ))}
+                {selectedCall?.recording_url && (
+                  <div className="pt-2">
+                    <a
+                      href={selectedCall.recording_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      🎧 Listen to Recording
+                    </a>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </motion.div>

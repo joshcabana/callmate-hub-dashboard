@@ -1,0 +1,95 @@
+{
+  "name": "CallMate Vapi Ingestion Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "callmate-vapi-receive",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "fc45d0f6-bb21-4f67-8efd-bb2c49c71a81",
+      "name": "Catch Server Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "callmate-vapi-receive"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "transcript",
+              "value": "={{$json.body.transcript}}"
+            },
+            {
+              "name": "summary",
+              "value": "={{$json.body.summary}}"
+            },
+            {
+              "name": "recordingUrl",
+              "value": "={{$json.body.recordingUrl}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1f72922-bcfd-4537-83eb-69cbeca945d8",
+      "name": "Format Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7dc1a9ae-f14d-4c31-8c4d-9a3b98ea5aee",
+      "name": "Destination (Database/CRM)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Replace this node with your actual destination (Supabase, Postgres, Airtable, or CRM)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Server Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Payload": {
+      "main": [
+        [
+          {
+            "node": "Destination (Database/CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f0d0fe0e-355b-43d9-9599-5ea0dc0dd676"
+}
