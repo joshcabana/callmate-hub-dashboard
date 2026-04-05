@@ -1,6 +1,18 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import twilio from 'twilio';
+import crypto from 'crypto';
+
+function secureCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
 
 // Supabase Connection
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -48,46 +60,65 @@ async function upsertCall(payload: {
     throw new Error('Missing SUPABASE config or BUSINESS_ID env var');
   }
 
-  // Idempotent upsert on vapi_call_id
-  const { data: call, error: callErr } = await supabase
+  let callId: string;
+  let isNew = false;
+
+  // 1. Definitively test if it's new via INSERT
+  const { data: insertData, error: insertErr } = await supabase
     .from('calls')
-    .upsert(
-      {
-        business_id: BUSINESS_ID,
-        vapi_call_id: payload.vapiCallId,
-        caller_number: payload.callerNumber,
-        duration_secs: payload.durationSecs,
-        status: 'completed',
-      },
-      { onConflict: 'vapi_call_id', ignoreDuplicates: false }
-    )
-    .select('id, created_at')
+    .insert({
+      business_id: BUSINESS_ID,
+      vapi_call_id: payload.vapiCallId,
+      caller_number: payload.callerNumber,
+      duration_secs: payload.durationSecs,
+      status: 'completed',
+    })
+    .select('id')
     .single();
 
-  if (callErr) throw new Error(`calls upsert: ${callErr.message}`);
+  if (insertErr) {
+    // 23505 is the Postgres unique violation code
+    if (insertErr.code === '23505' || insertErr.message?.includes('duplicate key value')) {
+      const { data: updateData, error: updateErr } = await supabase
+        .from('calls')
+        .update({
+          duration_secs: payload.durationSecs,
+          status: 'completed',
+        })
+        .eq('vapi_call_id', payload.vapiCallId)
+        .select('id')
+        .single();
 
-  const ageMs = Date.now() - new Date(call.created_at).getTime();
-  const isNew = ageMs < 10_000; // freshly created vs updated
+      if (updateErr) throw new Error(`calls update: ${updateErr.message}`);
+      callId = updateData.id;
+    } else {
+      throw new Error(`calls insert: ${insertErr.message}`);
+    }
+  } else {
+    callId = insertData.id;
+    isNew = true;
+  }
 
   // Upsert call_log — idempotent on call_id (one log per call)
   const { error: logErr } = await supabase
     .from('call_logs')
     .upsert(
       {
-        call_id: call.id,
+        call_id: callId,
         business_id: BUSINESS_ID,
         caller_number: payload.callerNumber,
         transcript: payload.transcript,
         summary: payload.summary,
+        recording_url: payload.recordingUrl,
         raw_payload: payload.rawPayload,
       },
-      { onConflict: 'call_id', ignoreDuplicates: true }
+      { onConflict: 'call_id', ignoreDuplicates: false }
     );
 
   if (logErr) throw new Error(`call_logs upsert: ${logErr.message}`);
 
-  console.log(`Upserted call ${payload.vapiCallId} (id=${call.id}, isNew=${isNew})`);
-  return { callId: call.id, isNew };
+  console.log(`Webhook handled for call ${payload.vapiCallId} (id=${callId}, isNew=${isNew})`);
+  return { callId, isNew };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -96,10 +127,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Auth
+  // Auth (Hardened against timing attacks)
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   const provided = req.headers['x-vapi-secret'];
-  if (!secret || provided !== secret) {
+  
+  if (!secret) {
+    console.error('SERVER ERROR: VAPI_WEBHOOK_SECRET is not configured in Vercel');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  
+  if (typeof provided !== 'string' || !secureCompare(provided, secret)) {
     console.error('Unauthorized webhook attempt');
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -138,11 +175,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Ignoring non-terminal event type:', message?.type ?? 'unknown');
     }
 
-    // Always 200 — prevents Vapi infinite retry loops
+    // On successful ingest, return 200
     return res.status(200).json({ status: 'ok' });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Webhook handler error:', err);
-    // Still 200 — log in Vercel, don't trigger Vapi retries
-    return res.status(200).json({ status: 'error_logged' });
+    // Explicit 500 triggers Vapi's automated webhook retry logic so we never drop a lead
+    return res.status(500).json({ 
+      error: 'Internal Server Error',
+      details: err instanceof Error ? err.message : 'Unknown error' 
+    });
   }
 }
