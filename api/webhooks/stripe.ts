@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 // Initialize Stripe
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-11-20.acacia" });
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
 
 // Initialize Supabase Service Role
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const businessId = session.subscription_data?.metadata?.businessId;
+      const businessId = session.client_reference_id;
       
       if (!businessId) {
           console.warn("checkout session missing businessId in metadata -> skipping");
@@ -53,7 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const subscriptionId = session.subscription as string;
-      await updateSubscriptionStatus(businessId, subscriptionId);
+      try {
+        await updateSubscriptionStatus(businessId, subscriptionId);
+      } catch (err) {
+        console.error("Webhook processing failed (checkout.session.completed):", err);
+        return res.status(500).json({ error: "Database sync failed" });
+      }
       break;
     }
 
@@ -67,7 +72,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           break;
       }
 
-      await updateSubscriptionStatus(businessId, subscription.id);
+      try {
+        await updateSubscriptionStatus(businessId, subscription.id);
+      } catch (err) {
+        console.error("Webhook processing failed (customer.subscription.*):", err);
+        return res.status(500).json({ error: "Database sync failed" });
+      }
       break;
     }
 
@@ -76,27 +86,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Return a response to acknowledge receipt of the event
-  res.status(200).json({ received: true });
+  return res.status(200).json({ received: true });
 }
 
 // Helper to pull fresh state from Stripe and UPSERT into businesses
 async function updateSubscriptionStatus(businessId: string, subscriptionId: string) {
-    try {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        const priceId = subscription.items.data[0]?.price.id || null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
+    const priceId = subscription.items.data[0]?.price.id || null;
+    
+    const { error } = await supabase
+        .from("businesses")
+        .update({
+            stripe_subscription_id: subscription.id,
+            stripe_price_id: priceId,
+            subscription_status: subscription.status,
+            subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        })
+        .eq("id", businessId);
         
-        await supabase
-            .from("businesses")
-            .update({
-                stripe_subscription_id: subscription.id,
-                stripe_price_id: priceId,
-                subscription_status: subscription.status,
-                subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            })
-            .eq("id", businessId);
-            
-        console.log(`Successfully synced subscription state for business ${businessId}`);
-    } catch (err) {
-        console.error("Failed syncing subscription from Stripe to DB:", err);
+    if (error) {
+        throw new Error(`Supabase update failed: ${error.message}`);
     }
+        
+    console.log(`Successfully synced subscription state for business ${businessId}`);
 }

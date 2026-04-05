@@ -4,12 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 
 // Initialize Stripe
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-11-20.acacia" });
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
 
-// Initialize Supabase with Service Role to bypass RLS securely in backends
+// Initialize Supabase with Service Role ONLY for internal mutations
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const adminSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -23,17 +24,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Missing business_id" });
   }
 
+  // Ensure request is authenticated
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Missing Authorization header" });
+  }
+
   try {
-    // 1. Fetch the business record
-    const { data: business, error } = await supabase
+    // Scaffold isolated client bound to the request's JWT
+    const userSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser();
+    if (authError || !user) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    // 1. Fetch the business record via RLS (prevents IDOR)
+    const { data: business, error } = await userSupabase
       .from("businesses")
       .select("*")
       .eq("id", business_id)
       .single();
 
     if (error || !business) {
-      console.error("Error fetching business:", error);
-      return res.status(404).json({ error: "Business not found." });
+      console.error("Error fetching business or unauthorized IDOR attempt:", error);
+      return res.status(404).json({ error: "Business not found or unauthorized." });
     }
 
     const returnUrl = `${req.headers.origin || "http://localhost:5173"}/billing`;
@@ -59,8 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       stripeCustomerId = customer.id;
 
-      // Persist the new customer ID
-      await supabase
+      // Persist the new customer ID using the admin client just in case
+      await adminSupabase
         .from("businesses")
         .update({ stripe_customer_id: stripeCustomerId })
         .eq("id", business_id);
