@@ -5,10 +5,9 @@ import crypto from 'crypto';
 
 function secureCompare(a: string, b: string): boolean {
   try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
+    const aHash = crypto.createHash('sha256').update(a).digest();
+    const bHash = crypto.createHash('sha256').update(b).digest();
+    return crypto.timingSafeEqual(aHash, bHash);
   } catch {
     return false;
   }
@@ -150,12 +149,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const recordingUrl = message.recordingUrl || message.call?.recordingUrl || message.artifact?.recordingUrl || '';
       const callerNumber = message.call?.customer?.number || message.customer?.number || 'unknown';
       const vapiCallId = message.call?.id || message.callId || `vapi-fallback-${Date.now()}`;
-      const durationSecs: number =
-        message.call?.endedAt && message.call?.startedAt
-          ? Math.round(
-              (new Date(message.call.endedAt).getTime() - new Date(message.call.startedAt).getTime()) / 1000
-            )
-          : (message.call?.duration ?? 0);
+      let durationSecs = message.call?.duration ?? 0;
+      if (message.call?.endedAt && message.call?.startedAt) {
+        const ms = new Date(message.call.endedAt).getTime() - new Date(message.call.startedAt).getTime();
+        if (!Number.isNaN(ms)) {
+          durationSecs = Math.round(ms / 1000);
+        }
+      }
 
       const { isNew } = await upsertCall({
         transcript,
@@ -181,8 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Webhook handler error:', err);
     // Explicit 500 triggers Vapi's automated webhook retry logic so we never drop a lead
     return res.status(500).json({ 
-      error: 'Internal Server Error',
-      details: err instanceof Error ? err.message : 'Unknown error' 
+      error: 'Internal Server Error' 
     });
   }
 }
