@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Call Logs", url: "/call-logs", icon: PhoneCall },
-  { title: "Agent Settings", url: "/agent-settings", icon: Settings },
-  { title: "Billing", url: "/billing", icon: CreditCard },
+  { title: "Dashboard", url: "/app", icon: LayoutDashboard },
+  { title: "Call Logs", url: "/app/call-logs", icon: PhoneCall },
+  { title: "Agent Settings", url: "/app/agent-settings", icon: Settings },
+  { title: "Billing", url: "/app/billing", icon: CreditCard },
 ];
 
 export function AppSidebar() {
@@ -52,7 +52,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                      <NavLink
                         to={item.url}
-                        end={item.url === "/"}
+                        end={item.url === "/app"}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground transition-colors hover:text-foreground hover:bg-secondary w-full"
                         activeClassName="bg-secondary text-primary font-medium"
                       >

@@ -13,6 +13,7 @@ import Billing from "./pages/Billing";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             {/* Public */}
+            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
 
             {/* Onboarding — protected but outside DashboardLayout */}
@@ -46,21 +48,24 @@ const App = () => (
 
             {/* Protected dashboard routes */}
             <Route
-              path="/*"
+              path="/app/*"
               element={
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
-                      <Route path="/call-logs" element={<CallLogs />} />
-                      <Route path="/agent-settings" element={<AgentSettings />} />
-                      <Route path="/billing" element={<Billing />} />
+                      <Route path="call-logs" element={<CallLogs />} />
+                      <Route path="agent-settings" element={<AgentSettings />} />
+                      <Route path="billing" element={<Billing />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </DashboardLayout>
                 </ProtectedRoute>
               }
             />
+            
+            {/* Global Catch-All */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
