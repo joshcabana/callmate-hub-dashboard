@@ -18,11 +18,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const { business_id, price_id } = req.body;
+  const { business_id, tier, price_id: rawPriceId } = req.body;
 
   if (!business_id) {
     return res.status(400).json({ error: "Missing business_id" });
   }
+
+  // Resolve price_id: prefer explicit price_id, fall back to tier-based lookup
+  const PRICE_MAP: Record<string, string | undefined> = {
+    starter: process.env.STRIPE_PRICE_STARTER,
+    pro: process.env.STRIPE_PRICE_PRO,
+  };
+  const resolvedPriceId = rawPriceId || (tier ? PRICE_MAP[tier] : undefined);
 
   // Ensure request is authenticated
   const authHeader = req.headers.authorization;
@@ -83,9 +90,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq("id", business_id);
     }
 
-    // 4. Create new Checkout Session
-    if (!price_id) {
-      return res.status(400).json({ error: "Missing price_id to start a new subscription." });
+    if (!resolvedPriceId) {
+      return res.status(400).json({ error: "Missing or invalid tier/price_id for new subscription." });
     }
 
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -93,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customer: stripeCustomerId,
       line_items: [
         {
-          price: price_id,
+          price: resolvedPriceId,
           quantity: 1,
         },
       ],

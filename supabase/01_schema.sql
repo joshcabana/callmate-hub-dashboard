@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS call_logs (
   intent_detected TEXT,
   caller_name TEXT,
   callback_number TEXT,
+  recording_url TEXT,
   raw_payload JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

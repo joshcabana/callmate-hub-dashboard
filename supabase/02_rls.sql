@@ -37,9 +37,10 @@ CREATE POLICY "Users can view own calls"
     )
   );
 
-CREATE POLICY "Service role can insert calls"
-  ON calls FOR INSERT
+CREATE POLICY "Service role can manage calls"
+  ON calls FOR ALL
   TO service_role
+  USING (true)
   WITH CHECK (true);
 
 -- ============================================
@@ -54,9 +55,10 @@ CREATE POLICY "Users can view own call logs"
     )
   );
 
-CREATE POLICY "Service role can insert call logs"
-  ON call_logs FOR INSERT
+CREATE POLICY "Service role can manage call logs"
+  ON call_logs FOR ALL
   TO service_role
+  USING (true)
   WITH CHECK (true);
 
 -- ============================================

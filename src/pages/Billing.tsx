@@ -7,7 +7,8 @@ import { CreditCard, Zap, Loader2, TrendingUp, Shield, Headphones } from "lucide
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardMetrics } from "@/lib/supabase";
+import { fetchDashboardMetrics, supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 // ── Pricing Tiers ────────────────────────────────────────────────────────
 const TIERS = [
@@ -120,20 +121,30 @@ export default function Billing() {
     setLoadingTier(tierId);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("You must be logged in to manage billing.");
+        return;
+      }
+
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ business_id: business.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ business_id: business.id, tier: tierId }),
       });
 
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error("No checkout URL returned", data);
+        toast.error(data.error || "Failed to create checkout session.");
       }
     } catch (err) {
       console.error("Failed to initiate checkout", err);
+      toast.error("Network error. Please try again.");
     } finally {
       setIsLoading(false);
       setLoadingTier(null);
