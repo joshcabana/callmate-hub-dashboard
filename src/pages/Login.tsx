@@ -37,7 +37,7 @@ export default function Login() {
         toast.error(error.message);
       } else {
         toast.success("Login successful!");
-        const fromPath = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
+        const fromPath = (location.state as { from?: { pathname: string } })?.from?.pathname || "/app";
         navigate(fromPath, { replace: true });
       }
     } catch (error: unknown) {

@@ -7,7 +7,7 @@ import { CreditCard, Zap, Loader2, TrendingUp, Shield, Headphones } from "lucide
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardMetrics, supabase } from "@/lib/supabase";
+import { fetchDashboardMetrics, supabase, isDemoMode } from "@/lib/supabase";
 import { toast } from "sonner";
 
 // ── Pricing Tiers ────────────────────────────────────────────────────────
@@ -116,6 +116,11 @@ export default function Billing() {
       return;
     }
     if (tierId === "free") return;
+
+    if (isDemoMode) {
+      toast.info("Stripe checkout is disabled in demo mode.");
+      return;
+    }
 
     setIsLoading(true);
     setLoadingTier(tierId);
