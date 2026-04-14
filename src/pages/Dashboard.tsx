@@ -132,7 +132,7 @@ export default function Dashboard() {
       {/* Metric cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {isLoading
-          ? [0, 1].map((i) => (
+          ? [0, 1, 2, 3].map((i) => (
               <motion.div key={i} variants={item}>
                 <MetricSkeleton />
               </motion.div>

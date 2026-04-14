@@ -164,7 +164,7 @@ export default function AgentSettings() {
           <CardTitle className="font-display text-lg">System Prompt</CardTitle>
           <CardDescription>
             Define how your AI agent should behave and respond to callers.{" "}
-            <span className="text-amber-500 text-xs">
+            <span className="text-warning text-xs">
               Note: Update this directly in your Vapi dashboard to apply it live.
             </span>
           </CardDescription>

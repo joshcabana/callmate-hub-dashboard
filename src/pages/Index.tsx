@@ -24,6 +24,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+
       {/* Dynamic Background Glow */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-primary/10 blur-[120px]" />
@@ -70,7 +71,7 @@ export default function Index() {
             <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium uppercase tracking-wider mb-2">
               <Zap className="h-3.5 w-3.5" /> Next-Gen Autonomous Agents
             </motion.div>
-            <motion.h1 variants={itemVariants} className="font-display text-5xl md:text-7xl font-bold tracking-tight leading-tight text-white">
+            <motion.h1 variants={itemVariants} className="font-display text-5xl md:text-7xl font-bold tracking-tight leading-tight text-foreground">
               Automate your call center with <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">hyper-realistic AI.</span>
             </motion.h1>
             <motion.p variants={itemVariants} className="text-lg md:text-xl text-muted-foreground max-w-2xl mt-2 mb-4 leading-relaxed">
@@ -80,7 +81,7 @@ export default function Index() {
               <Button asChild size="lg" className="h-12 px-8 text-base bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full sm:w-auto">
                 <Link to="/login">Start building for free <ChevronRight className="ml-1 h-4 w-4" /></Link>
               </Button>
-              <Button variant="outline" size="lg" className="h-12 px-8 text-base bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-full w-full sm:w-auto">
+              <Button variant="outline" size="lg" className="h-12 px-8 text-base bg-secondary border-border hover:bg-secondary/80 text-foreground rounded-full w-full sm:w-auto" onClick={() => setIsPlaying(!isPlaying)}>
                 <Play className="mr-2 h-4 w-4 text-primary" /> Hear a Live Demo
               </Button>
             </motion.div>
@@ -94,12 +95,11 @@ export default function Index() {
             className="w-full max-w-5xl mt-20 relative"
           >
             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-accent/30 rounded-2xl blur-xl opacity-50" />
-            <div className="relative rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl overflow-hidden aspect-video flex items-center justify-center">
-              {/* Abstract Dashboard representation */}
-              <div className="absolute top-0 w-full h-10 border-b border-white/10 bg-white/5 flex items-center px-4 gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                <div className="w-3 h-3 rounded-full bg-green-500/50" />
+            <div className="relative rounded-2xl border border-border bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden aspect-video flex items-center justify-center">
+              <div className="absolute top-0 w-full h-10 border-b border-border bg-secondary/50 flex items-center px-4 gap-2">
+                <div className="w-3 h-3 rounded-full bg-destructive/50" />
+                <div className="w-3 h-3 rounded-full bg-warning/50" />
+                <div className="w-3 h-3 rounded-full bg-success/50" />
               </div>
               
               <div className="flex flex-col items-center gap-4 mt-10">
@@ -107,10 +107,10 @@ export default function Index() {
                   <div className="absolute inset-0 rounded-full border border-primary/40 animate-ping" />
                   <PhoneCall className="h-10 w-10 text-primary animate-pulse" />
                 </div>
-                <div className="text-xl font-display font-medium text-white">CallMate Support Agent</div>
+                <div className="text-xl font-display font-medium text-foreground">CallMate Support Agent</div>
                 <div className="flex gap-1.5 items-center">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-sm text-emerald-500 font-medium">Live connection...</span>
+                  <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                  <span className="text-sm text-success font-medium">Live connection...</span>
                 </div>
                 
                 {/* Fake audio waveform */}
@@ -162,7 +162,7 @@ export default function Index() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                  className="p-6 rounded-2xl border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors"
                 >
                   <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                     <feature.icon className="h-6 w-6 text-primary" />
@@ -191,7 +191,7 @@ export default function Index() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 bg-black/50 backdrop-blur-sm relative z-10">
+      <footer className="border-t border-border py-12 bg-card/50 backdrop-blur-sm relative z-10">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2 text-muted-foreground">
             <PhoneCall className="h-5 w-5" />

@@ -26,7 +26,7 @@ export default function Onboarding() {
     try {
       await createBusiness(name.trim(), phone.trim() || undefined);
       toast.success("Business created! Welcome to CallMate AI.");
-      navigate("/", { replace: true });
+      navigate("/app", { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create business.");
     } finally {
