@@ -17,9 +17,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Auto redirect if already logged in
-  if (session) {
-    const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
+  // Auto redirect if already logged in or in demo mode
+  if (session || isDemoMode) {
+    const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/app";
     return <Navigate to={from} replace />;
   }
 
