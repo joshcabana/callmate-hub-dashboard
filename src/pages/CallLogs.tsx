@@ -34,7 +34,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { AlertCircle, Inbox, Download, Search, CalendarIcon, X, Filter } from "lucide-react";
+import { AlertCircle, Inbox, Download, Search, CalendarIcon, X, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { fetchCallLogs, type CallLog } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +64,8 @@ export default function CallLogs() {
   const [intentFilter, setIntentFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const {
     data: calls = [],
@@ -113,11 +115,24 @@ export default function CallLogs() {
 
   const hasActiveFilters = searchQuery || intentFilter !== "all" || dateFrom || dateTo;
 
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery, intentFilter, dateFrom, dateTo]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredCalls.length / pageSize));
+  const paginatedCalls = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCalls.slice(start, start + pageSize);
+  }, [filteredCalls, currentPage, pageSize]);
+
   const clearFilters = () => {
     setSearchQuery("");
     setIntentFilter("all");
     setDateFrom(undefined);
     setDateTo(undefined);
+    setCurrentPage(1);
   };
 
   // ── Loading Skeleton ───────────────────────────────────────────
@@ -350,7 +365,7 @@ export default function CallLogs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCalls.map((call) => (
+                {paginatedCalls.map((call) => (
                   <TableRow key={call.id} className="border-border">
                     <TableCell className="text-sm whitespace-nowrap">
                       {format(new Date(call.created_at), "d MMM yyyy, HH:mm")}
@@ -392,6 +407,75 @@ export default function CallLogs() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Pagination controls */}
+            {filteredCalls.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border mt-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Rows per page</span>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => {
+                      setPageSize(Number(v));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[70px] h-8 bg-secondary border-border text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      {[10, 20, 50].map((size) => (
+                        <SelectItem key={size} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-muted-foreground mr-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           )}
         </CardContent>
       </Card>
