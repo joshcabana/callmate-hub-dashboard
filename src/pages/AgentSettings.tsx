@@ -15,7 +15,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateBusiness } from "@/lib/supabase";
+import { updateBusiness, fetchAgentConfig, upsertAgentConfig } from "@/lib/supabase";
 import { Save, Loader2 } from "lucide-react";
 
 const voices = [
@@ -37,10 +37,6 @@ If you cannot help with a request, offer to transfer the caller to a human repre
 export default function AgentSettings() {
   const { business, refreshBusiness } = useAuth();
 
-  // Derive initial state from the business record
-  // We store these in the vapi_assistant_id and phone fields for MVP;
-  // a proper schema would have dedicated columns. Using JSON in a settings field
-  // is cleaner — but for now we persist what we can to the businesses table.
   const [businessName, setBusinessName] = useState(business?.name ?? "");
   const [phone, setPhone] = useState(business?.phone ?? "");
   const [vapiAssistantId, setVapiAssistantId] = useState(business?.vapi_assistant_id ?? "");
@@ -49,16 +45,26 @@ export default function AgentSettings() {
   const [voice, setVoice] = useState("sarah");
   const [sensitivity, setSensitivity] = useState([50]);
   const [saving, setSaving] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
-  // Sync business data into form on load
+  // Load agent config from DB
   useEffect(() => {
-    if (business) {
+    if (business && !configLoaded) {
       setBusinessName(business.name);
       setPhone(business.phone ?? "");
       setVapiAssistantId(business.vapi_assistant_id ?? "");
       setTwilioNumber(business.twilio_number ?? "");
+
+      fetchAgentConfig(business.id).then((config) => {
+        if (config) {
+          setSystemPrompt(config.system_prompt || DEFAULT_PROMPT);
+          setVoice(config.voice || "sarah");
+          setSensitivity([config.interruption_sensitivity ?? 50]);
+        }
+        setConfigLoaded(true);
+      }).catch(() => setConfigLoaded(true));
     }
-  }, [business]);
+  }, [business, configLoaded]);
 
   const handleSave = async () => {
     if (!business) {
@@ -68,12 +74,21 @@ export default function AgentSettings() {
 
     setSaving(true);
     try {
+      // Save business details
       await updateBusiness(business.id, {
         name: businessName.trim() || business.name,
         phone: phone.trim() || null,
         vapi_assistant_id: vapiAssistantId.trim() || null,
         twilio_number: twilioNumber.trim() || null,
       });
+
+      // Save agent config
+      await upsertAgentConfig(business.id, {
+        system_prompt: systemPrompt,
+        voice,
+        interruption_sensitivity: sensitivity[0],
+      });
+
       await refreshBusiness();
       toast.success("Settings saved successfully.");
     } catch (err) {
@@ -98,30 +113,16 @@ export default function AgentSettings() {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="font-display text-lg">Business Details</CardTitle>
-          <CardDescription>
-            Your business information used by the AI receptionist.
-          </CardDescription>
+          <CardDescription>Your business information used by the AI receptionist.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="business-name">Business Name</Label>
-            <Input
-              id="business-name"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              className="bg-secondary border-border"
-            />
+            <Input id="business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="bg-secondary border-border" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="business-phone">Contact Phone</Label>
-            <Input
-              id="business-phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+61 4xx xxx xxx"
-              className="bg-secondary border-border"
-            />
+            <Input id="business-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+61 4xx xxx xxx" className="bg-secondary border-border" />
           </div>
         </CardContent>
       </Card>
@@ -130,30 +131,16 @@ export default function AgentSettings() {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="font-display text-lg">Integrations</CardTitle>
-          <CardDescription>
-            Connect your Vapi assistant and Twilio number.
-          </CardDescription>
+          <CardDescription>Connect your Vapi assistant and Twilio number.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="vapi-id">Vapi Assistant ID</Label>
-            <Input
-              id="vapi-id"
-              value={vapiAssistantId}
-              onChange={(e) => setVapiAssistantId(e.target.value)}
-              placeholder="e.g. asst_..."
-              className="bg-secondary border-border font-mono text-sm"
-            />
+            <Input id="vapi-id" value={vapiAssistantId} onChange={(e) => setVapiAssistantId(e.target.value)} placeholder="e.g. asst_..." className="bg-secondary border-border font-mono text-sm" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="twilio-number">Twilio Phone Number</Label>
-            <Input
-              id="twilio-number"
-              value={twilioNumber}
-              onChange={(e) => setTwilioNumber(e.target.value)}
-              placeholder="+1 555 xxx xxxx"
-              className="bg-secondary border-border font-mono text-sm"
-            />
+            <Input id="twilio-number" value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+1 555 xxx xxxx" className="bg-secondary border-border font-mono text-sm" />
           </div>
         </CardContent>
       </Card>
@@ -162,19 +149,10 @@ export default function AgentSettings() {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="font-display text-lg">System Prompt</CardTitle>
-          <CardDescription>
-            Define how your AI agent should behave and respond to callers.{" "}
-            <span className="text-warning text-xs">
-              Note: Update this directly in your Vapi dashboard to apply it live.
-            </span>
-          </CardDescription>
+          <CardDescription>Define how your AI agent should behave and respond to callers.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            className="min-h-[200px] bg-secondary border-border text-foreground resize-none focus-visible:ring-primary"
-          />
+          <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} className="min-h-[200px] bg-secondary border-border text-foreground resize-none focus-visible:ring-primary" />
         </CardContent>
       </Card>
 
@@ -205,18 +183,10 @@ export default function AgentSettings() {
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="font-display text-lg">Interruption Sensitivity</CardTitle>
-          <CardDescription>
-            How quickly the agent pauses when the caller starts speaking.
-          </CardDescription>
+          <CardDescription>How quickly the agent pauses when the caller starts speaking.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Slider
-            value={sensitivity}
-            onValueChange={setSensitivity}
-            max={100}
-            step={1}
-            className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary"
-          />
+          <Slider value={sensitivity} onValueChange={setSensitivity} max={100} step={1} className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-primary" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Low (waits longer)</span>
             <span className="text-foreground font-medium">{sensitivity[0]}%</span>
@@ -225,16 +195,8 @@ export default function AgentSettings() {
         </CardContent>
       </Card>
 
-      <Button
-        onClick={handleSave}
-        disabled={saving}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
-      >
-        {saving ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Save className="h-4 w-4" />
-        )}
+      <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         {saving ? "Saving..." : "Save Settings"}
       </Button>
     </motion.div>

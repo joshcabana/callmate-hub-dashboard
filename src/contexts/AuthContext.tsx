@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { supabase, fetchBusiness, isDemoMode, type Business } from "@/lib/supabase";
+import { supabase, fetchBusiness, type Business } from "@/lib/supabase";
 
 type AuthContextType = {
   session: Session | null;
@@ -26,13 +26,9 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Fake session/user for demo mode
-const DEMO_USER = { id: "demo-user-001", email: "demo@callmate.ai" } as User;
-const DEMO_SESSION = { user: DEMO_USER, access_token: "demo" } as Session;
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(isDemoMode ? DEMO_SESSION : null);
-  const [user, setUser] = useState<User | null>(isDemoMode ? DEMO_USER : null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -50,11 +46,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    if (isDemoMode) {
-      // In demo mode, load demo business immediately
-      loadBusiness().then(() => setIsLoading(false));
-      return;
-    }
+    // Set up auth listener BEFORE getSession (per Supabase best practices)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await loadBusiness();
+        } else {
+          setBusiness(null);
+        }
+        setIsLoading(false);
+      }
+    );
 
     // Initial session load
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -66,26 +70,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(false);
     });
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadBusiness();
-        } else {
-          setBusiness(null);
-        }
-      }
-    );
-
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    if (!isDemoMode) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     setBusiness(null);
   };
 
@@ -93,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, business, isLoading, needsOnboarding, isDemo: isDemoMode, refreshBusiness, signOut }}
+      value={{ session, user, business, isLoading, needsOnboarding, isDemo: false, refreshBusiness, signOut }}
     >
       {children}
     </AuthContext.Provider>
