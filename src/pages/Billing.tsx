@@ -201,7 +201,7 @@ export default function Billing() {
           <div className="space-y-2">
             <Progress value={usagePercent} className="h-2 bg-secondary [&>div]:bg-primary" />
             {usagePercent >= 80 && usagePercent < 100 && (
-              <div className="flex items-center gap-2 text-xs text-amber-500">
+              <div className="flex items-center gap-2 text-xs text-warning">
                 <TrendingUp className="h-3.5 w-3.5" />
                 You're at {usagePercent}% of your plan — consider upgrading for uninterrupted service.
               </div>
