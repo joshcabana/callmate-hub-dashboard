@@ -150,13 +150,13 @@ export default function Dashboard() {
                     <div className="text-3xl font-display font-bold">{m.value}</div>
                     <div className="flex items-center gap-1 mt-1 text-xs">
                       {m.trend === "up" ? (
-                        <TrendingUp className="h-3 w-3 text-emerald-500" />
+                        <TrendingUp className="h-3 w-3 text-success" />
                       ) : (
                         <TrendingDown className="h-3 w-3 text-destructive" />
                       )}
                       <span
                         className={
-                          m.trend === "up" ? "text-emerald-500" : "text-destructive"
+                          m.trend === "up" ? "text-success" : "text-destructive"
                         }
                       >
                         {m.change}
