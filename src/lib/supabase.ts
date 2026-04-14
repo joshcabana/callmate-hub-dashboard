@@ -1,14 +1,9 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export { supabase };
 
-// Demo mode when Supabase is not configured
-export const isDemoMode = !supabaseUrl || !supabaseAnonKey;
-
-export const supabase: SupabaseClient = isDemoMode
-  ? (null as unknown as SupabaseClient) // placeholder — all queries go through demo helpers
-  : createClient(supabaseUrl, supabaseAnonKey);
+// Demo mode is no longer needed — we have a real backend
+export const isDemoMode = false;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +50,16 @@ export interface Business {
   subscription_current_period_end: string | null;
 }
 
+export interface AgentConfig {
+  id: string;
+  business_id: string;
+  system_prompt: string;
+  voice: string;
+  interruption_sensitivity: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardMetrics {
   totalCalls: number;
   totalMinutes: number;
@@ -65,94 +70,9 @@ export interface DashboardMetrics {
   dailyCounts: { day: string; calls: number }[];
 }
 
-// ── Demo Data ──────────────────────────────────────────────────────────────
-
-const DEMO_BUSINESS: Business = {
-  id: "demo-biz-001",
-  owner_id: "demo-user-001",
-  name: "Smith's Auto Repair",
-  phone: "+61 412 345 678",
-  twilio_number: "+1 555 123 4567",
-  vapi_assistant_id: "asst_demo_abc123",
-  plan: "starter",
-  trial_ends_at: null,
-  created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-  updated_at: new Date().toISOString(),
-  stripe_customer_id: null,
-  stripe_subscription_id: null,
-  stripe_price_id: null,
-  subscription_status: null,
-  subscription_current_period_end: null,
-};
-
-function generateDemoCallLogs(): CallLog[] {
-  const intents = ["Appointment", "Pricing Inquiry", "Follow-up", "Emergency", "General Question"];
-  const names = ["Sarah Chen", "Marcus Webb", "Elena Torres", "James O'Brien", "Priya Patel", "Liam Nguyen"];
-  const numbers = ["+61 400 111 222", "+61 412 333 444", "+61 403 555 666", "+1 555 987 6543", "+44 7911 123456", "+61 499 876 543"];
-
-  return Array.from({ length: 12 }, (_, i) => {
-    const hoursAgo = i * 4 + Math.floor(Math.random() * 3);
-    const created = new Date(Date.now() - hoursAgo * 3600000);
-    const name = names[i % names.length];
-    const intent = intents[i % intents.length];
-    return {
-      id: `demo-log-${i}`,
-      call_id: `call_${Math.random().toString(36).slice(2, 10)}`,
-      business_id: DEMO_BUSINESS.id,
-      caller_number: numbers[i % numbers.length],
-      caller_name: name,
-      callback_number: i % 3 === 0 ? numbers[i % numbers.length] : null,
-      intent_detected: intent,
-      summary: `${name} called regarding ${intent.toLowerCase()}. ${
-        i % 2 === 0
-          ? "Caller requested a callback for tomorrow morning."
-          : "Issue was resolved during the call."
-      }`,
-      transcript: `Agent: Good morning, Smith's Auto Repair. How can I help you today?\n\n${name}: Hi, I'm calling about ${intent.toLowerCase()}.\n\nAgent: Of course! I'd be happy to help with that. Let me pull up the details for you.\n\n${name}: That would be great, thank you.\n\nAgent: ${
-        i % 2 === 0
-          ? "I've noted your request. Would you like us to call you back tomorrow morning?"
-          : "I've got all the information you need. Is there anything else I can help with?"
-      }\n\n${name}: ${i % 2 === 0 ? "Yes please, that works perfectly." : "No, that's everything. Thanks!"}\n\nAgent: Wonderful. Have a great day!`,
-      recording_url: null,
-      raw_payload: null,
-      created_at: created.toISOString(),
-    };
-  });
-}
-
-function generateDemoMetrics(): DashboardMetrics {
-  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const now = new Date();
-  const dailyCounts: { day: string; calls: number }[] = [];
-
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    dailyCounts.push({
-      day: dayLabels[d.getDay()],
-      calls: Math.floor(Math.random() * 18) + 5,
-    });
-  }
-
-  const callsThisWeek = dailyCounts.reduce((s, d) => s + d.calls, 0);
-  const callsLastWeek = Math.floor(callsThisWeek * (0.75 + Math.random() * 0.3));
-
-  return {
-    totalCalls: 847,
-    totalMinutes: 2_134,
-    callsThisWeek,
-    callsLastWeek,
-    minutesThisWeek: callsThisWeek * 3,
-    minutesLastWeek: callsLastWeek * 3,
-    dailyCounts,
-  };
-}
-
 // ── Queries ────────────────────────────────────────────────────────────────
 
 export async function fetchCallLogs(): Promise<CallLog[]> {
-  if (isDemoMode) return generateDemoCallLogs();
-
   const { data, error } = await supabase
     .from("call_logs")
     .select("*")
@@ -160,12 +80,10 @@ export async function fetchCallLogs(): Promise<CallLog[]> {
     .limit(100);
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []) as CallLog[];
 }
 
 export async function fetchBusiness(): Promise<Business | null> {
-  if (isDemoMode) return DEMO_BUSINESS;
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -176,12 +94,10 @@ export async function fetchBusiness(): Promise<Business | null> {
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as Business | null;
 }
 
 export async function createBusiness(name: string, phone?: string): Promise<Business> {
-  if (isDemoMode) return { ...DEMO_BUSINESS, name, phone: phone ?? null };
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -192,12 +108,10 @@ export async function createBusiness(name: string, phone?: string): Promise<Busi
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as Business;
 }
 
 export async function updateBusiness(id: string, updates: Partial<Business>): Promise<void> {
-  if (isDemoMode) return;
-
   const { error } = await supabase
     .from("businesses")
     .update(updates)
@@ -206,9 +120,32 @@ export async function updateBusiness(id: string, updates: Partial<Business>): Pr
   if (error) throw new Error(error.message);
 }
 
-export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
-  if (isDemoMode) return generateDemoMetrics();
+export async function fetchAgentConfig(businessId: string): Promise<AgentConfig | null> {
+  const { data, error } = await supabase
+    .from("agent_configs")
+    .select("*")
+    .eq("business_id", businessId)
+    .maybeSingle();
 
+  if (error) throw new Error(error.message);
+  return data as AgentConfig | null;
+}
+
+export async function upsertAgentConfig(
+  businessId: string,
+  config: { system_prompt: string; voice: string; interruption_sensitivity: number }
+): Promise<void> {
+  const { error } = await supabase
+    .from("agent_configs")
+    .upsert(
+      { business_id: businessId, ...config },
+      { onConflict: "business_id" }
+    );
+
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   const now = new Date();
   const startOfThisWeek = new Date(now);
   startOfThisWeek.setDate(now.getDate() - 6);
