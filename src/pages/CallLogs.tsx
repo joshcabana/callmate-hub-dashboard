@@ -476,6 +476,7 @@ export default function CallLogs() {
                 </div>
               </div>
             )}
+            </>
           )}
         </CardContent>
       </Card>
