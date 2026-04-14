@@ -354,7 +354,7 @@ export default function CallLogs() {
               </Button>
             </div>
           ) : (
-            <Table>
+            <><Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Date</TableHead>
