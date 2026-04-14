@@ -14,7 +14,249 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agent_configs: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          interruption_sensitivity: number
+          system_prompt: string
+          updated_at: string
+          voice: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          interruption_sensitivity?: number
+          system_prompt?: string
+          updated_at?: string
+          voice?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          interruption_sensitivity?: number
+          system_prompt?: string
+          updated_at?: string
+          voice?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_configs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          phone: string | null
+          plan: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          subscription_current_period_end: string | null
+          subscription_status: string | null
+          trial_ends_at: string | null
+          twilio_number: string | null
+          updated_at: string
+          vapi_assistant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          phone?: string | null
+          plan?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_status?: string | null
+          trial_ends_at?: string | null
+          twilio_number?: string | null
+          updated_at?: string
+          vapi_assistant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          phone?: string | null
+          plan?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_status?: string | null
+          trial_ends_at?: string | null
+          twilio_number?: string | null
+          updated_at?: string
+          vapi_assistant_id?: string | null
+        }
+        Relationships: []
+      }
+      call_logs: {
+        Row: {
+          business_id: string
+          call_id: string
+          callback_number: string | null
+          caller_name: string | null
+          caller_number: string | null
+          created_at: string
+          id: string
+          intent_detected: string | null
+          raw_payload: Json | null
+          recording_url: string | null
+          summary: string | null
+          transcript: string | null
+        }
+        Insert: {
+          business_id: string
+          call_id: string
+          callback_number?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string
+          id?: string
+          intent_detected?: string | null
+          raw_payload?: Json | null
+          recording_url?: string | null
+          summary?: string | null
+          transcript?: string | null
+        }
+        Update: {
+          business_id?: string
+          call_id?: string
+          callback_number?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string
+          id?: string
+          intent_detected?: string | null
+          raw_payload?: Json | null
+          recording_url?: string | null
+          summary?: string | null
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_logs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_logs_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: true
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          business_id: string
+          caller_number: string | null
+          created_at: string
+          duration_secs: number | null
+          id: string
+          status: string | null
+          vapi_call_id: string | null
+        }
+        Insert: {
+          business_id: string
+          caller_number?: string | null
+          created_at?: string
+          duration_secs?: number | null
+          id?: string
+          status?: string | null
+          vapi_call_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          caller_number?: string | null
+          created_at?: string
+          duration_secs?: number | null
+          id?: string
+          status?: string | null
+          vapi_call_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          business_id: string
+          cancel_at_period_end: boolean | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
