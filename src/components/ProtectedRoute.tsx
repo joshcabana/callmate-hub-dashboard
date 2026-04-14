@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, isLoading, needsOnboarding } = useAuth();
+  const { session, isLoading, needsOnboarding, isDemo } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -11,6 +11,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
+  }
+
+  // Demo mode bypasses auth
+  if (isDemo) {
+    return <>{children}</>;
   }
 
   if (!session) {

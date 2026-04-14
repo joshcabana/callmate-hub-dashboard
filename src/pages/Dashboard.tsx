@@ -150,13 +150,13 @@ export default function Dashboard() {
                     <div className="text-3xl font-display font-bold">{m.value}</div>
                     <div className="flex items-center gap-1 mt-1 text-xs">
                       {m.trend === "up" ? (
-                        <TrendingUp className="h-3 w-3 text-emerald-500" />
+                        <TrendingUp className="h-3 w-3 text-success" />
                       ) : (
                         <TrendingDown className="h-3 w-3 text-destructive" />
                       )}
                       <span
                         className={
-                          m.trend === "up" ? "text-emerald-500" : "text-destructive"
+                          m.trend === "up" ? "text-success" : "text-destructive"
                         }
                       >
                         {m.change}
@@ -188,32 +188,37 @@ export default function Dashboard() {
                   <LineChart data={metrics?.dailyCounts ?? []}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(222 20% 16%)"
+                      stroke="hsl(var(--border))"
                     />
                     <XAxis
                       dataKey="day"
-                      stroke="hsl(215 20% 55%)"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
                     />
                     <YAxis
-                      stroke="hsl(215 20% 55%)"
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                      width={32}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(222 44% 10%)",
-                        border: "1px solid hsl(222 20% 16%)",
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
-                        color: "hsl(210 40% 93%)",
+                        color: "hsl(var(--foreground))",
                       }}
                     />
                     <Line
                       type="monotone"
                       dataKey="calls"
-                      stroke="hsl(173 80% 50%)"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={2}
-                      dot={{ fill: "hsl(173 80% 50%)", r: 4 }}
+                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>
